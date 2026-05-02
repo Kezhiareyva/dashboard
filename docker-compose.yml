@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # MQTT Broker (Mosquitto)
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "1883:1883" # MQTT port
+      - "9001:9001" # WebSocket port (optional)
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # MQTT WebSocket Bridge Server
+  mqtt-server:
+    build:
+      context: ./mqtt-server
+      dockerfile: Dockerfile
+    container_name: mqtt-server
+    ports:
+      - "8080:8080" # WebSocket port
+    environment:
+      - MQTT_BROKER=mqtt://mosquitto:1883
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "8080" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./dashboard/aircraft
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:80" # Expose on port 3000 for Nginx Proxy Manager
+    depends_on:
+      - mqtt-server
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
