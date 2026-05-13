@@ -1,13 +1,25 @@
 version: '3.8'
 
 services:
-  # MQTT Broker (Mosquitto)
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: kezhia151204
+      POSTGRES_DB: sensor_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: mosquitto
     ports:
-      - "1883:1883" # MQTT port
-      - "9001:9001" # WebSocket port (optional)
+      - "4000:4000"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
       - mosquitto_data:/mosquitto/data
@@ -16,38 +28,33 @@ services:
     networks:
       - app-network
 
-  # MQTT WebSocket Bridge Server
   mqtt-server:
     build:
       context: ./mqtt-server
       dockerfile: Dockerfile
     container_name: mqtt-server
-    ports:
-      - "8080:8080" # WebSocket port
     environment:
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - DATABASE_URL=postgresql://postgres:kezhia151204@postgres:5432/sensor_db
     depends_on:
       - mosquitto
+      - postgres
     restart: unless-stopped
+    expose:
+      - "8080"
     networks:
       - app-network
-    healthcheck:
-      test: [ "CMD", "nc", "-z", "localhost", "8080" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # React Frontend
   frontend:
     build:
       context: ./dashboard/aircraft
       dockerfile: Dockerfile
     container_name: frontend
-    ports:
-      - "3000:80" # Expose on port 3000 for Nginx Proxy Manager
     depends_on:
       - mqtt-server
     restart: unless-stopped
+    expose:
+      - "80"
     networks:
       - app-network
 
@@ -58,3 +65,4 @@ networks:
 volumes:
   mosquitto_data:
   mosquitto_log:
+  postgres_data:

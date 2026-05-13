@@ -19,42 +19,48 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-export default function PressureDashboard() {
-  const [pressure, setPressure] = useState(() => {
-  const saved = localStorage.getItem("currentPressure");
-  return saved ? Number(saved) : 0;
-});
+export default function AltimeterDashboard() {
+  // Menggunakan key 'ketinggian' agar selaras dengan database PostgreSQL
+  const [ketinggian, setKetinggian] = useState(() => {
+    const saved = localStorage.getItem("currentKetinggian");
+    return saved ? Number(saved) : 0;
+  });
 
-const [history, setHistory] = useState(() => {
-  const saved = localStorage.getItem("pressureHistory");
-  return saved ? JSON.parse(saved) : [];
-});
+  const [history, setHistory] = useState(() => {
+    const saved = localStorage.getItem("ketinggianHistory");
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  // SIMPAN SETIAP UPDATE
+  // SIMPAN SETIAP UPDATE KE LOCAL STORAGE
   useEffect(() => {
-    localStorage.setItem("pressureHistory", JSON.stringify(history));
-    localStorage.setItem("currentPressure", pressure);
-  }, [history, pressure]);
+    localStorage.setItem("ketinggianHistory", JSON.stringify(history));
+    localStorage.setItem("currentKetinggian", ketinggian);
+  }, [history, ketinggian]);
 
+  // KONEKSI WEBSOCKET KE BACKEND NODE.JS
   useEffect(() => {
-  const ws = new WebSocket("ws://localhost:8080");
+    const ws = new WebSocket(import.meta.env.VITE_WS_URL);
 
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    setPressure(data.pressure);
-    setHistory(prev => [
-      ...prev.slice(-19),
-      { time: new Date().toLocaleTimeString(), value: data.pressure }
-    ]);
-  };
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      // Memastikan data yang masuk memiliki properti 'ketinggian'
+      if (data.ketinggian !== undefined) {
+        setKetinggian(data.ketinggian);
+        setHistory((prev) => [
+          ...prev.slice(-19), // Menyimpan 20 data terakhir
+          { time: new Date().toLocaleTimeString(), value: data.ketinggian },
+        ]);
+      }
+    };
 
-  return () => ws.close();
-}, []);
-
+    return () => ws.close();
+  }, []);
 
   const getStatus = () => {
-    if (pressure < 980) return { label: "Rendah", color: "info" };
-    if (pressure > 1030) return { label: "Tinggi", color: "error" };
+    // Ambang batas disesuaikan dengan elevasi geografis rata-rata area Bojongsoang/Bandung
+    if (ketinggian < 650) return { label: "Rendah", color: "info" };
+    if (ketinggian > 750) return { label: "Tinggi", color: "error" };
     return { label: "Normal", color: "success" };
   };
 
@@ -69,7 +75,7 @@ const [history, setHistory] = useState(() => {
             Dashboard Monitoring Altimeter
           </Typography>
           <Typography color="text.secondary">
-            Monitoring Tekanan Udara
+            Monitoring Ketinggian (Elevasi)
           </Typography>
         </Box>
 
@@ -81,10 +87,10 @@ const [history, setHistory] = useState(() => {
                 <Box display="flex" justifyContent="space-between">
                   <Box>
                     <Typography color="text.secondary">
-                      Tekanan Saat Ini
+                      Ketinggian Saat Ini
                     </Typography>
                     <Typography variant="h4" fontWeight={600}>
-                      {pressure} hPa
+                      {ketinggian} mdpl
                     </Typography>
                   </Box>
                   <SpeedIcon color="action" sx={{ fontSize: 48 }} />
@@ -116,7 +122,7 @@ const [history, setHistory] = useState(() => {
               <CardContent>
                 <Typography color="text.secondary">Ambang Normal</Typography>
                 <Typography variant="h5" fontWeight={600} mt={1}>
-                  980 – 1030 hPa
+                  650 – 750 mdpl
                 </Typography>
               </CardContent>
             </Card>
@@ -127,12 +133,13 @@ const [history, setHistory] = useState(() => {
         <Card elevation={3} sx={{ borderRadius: 3, mt: 4 }}>
           <CardContent>
             <Typography variant="h6" fontWeight={600} gutterBottom>
-              Grafik Tekanan Udara
+              Grafik Ketinggian
             </Typography>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={history}>
                 <XAxis dataKey="time" />
-                <YAxis domain={[950, 1050]} />
+                {/* Domain Y-Axis disesuaikan agar grafik terlihat berfluktuasi dengan jelas di kisaran normal */}
+                <YAxis domain={[600, 800]} />
                 <Tooltip />
                 <Line
                   type="monotone"

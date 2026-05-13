@@ -12,7 +12,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "mqtt": "^5.14.1",
-    "ws": "^8.18.3"
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "mqtt": "^5.15.1",
+    "pg": "^8.20.0",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "prisma": "^7.8.0"
   }
 }

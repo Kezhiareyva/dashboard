@@ -19,6 +19,8 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
@@ -75,3 +77,10 @@ Desktop.ini
 .eslintcache
 .stylelintcache
 .yarn/
+
+.prisma
+
+postgres_data
+
+mosquitto/data/
+mosquitto/log/
