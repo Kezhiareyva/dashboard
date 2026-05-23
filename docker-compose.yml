@@ -4,7 +4,7 @@ services:
 
   postgres:
     image: postgres:16
-    container_name: postgres
+    container_name: postgressql
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: kezhia151204
@@ -34,14 +34,14 @@ services:
       dockerfile: Dockerfile
     container_name: mqtt-server
     environment:
-      - MQTT_BROKER=mqtt://mosquitto:1883
+      - MQTT_BROKER=mqtt://mosquitto:4000
       - DATABASE_URL=postgresql://postgres:kezhia151204@postgres:5432/sensor_db
     depends_on:
       - mosquitto
       - postgres
     restart: unless-stopped
-    expose:
-      - "8080"
+    ports:
+      - "3000:3000"
     networks:
       - app-network
 
@@ -53,8 +53,8 @@ services:
     depends_on:
       - mqtt-server
     restart: unless-stopped
-    expose:
-      - "80"
+    ports:
+      - "2000:80"
     networks:
       - app-network
 

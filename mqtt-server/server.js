@@ -15,6 +15,15 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({
   adapter,
 });
+
+const PORT = process.env.PORT || 3000;
+const server = HTMLOutputElement.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Halo! API dan WebSocket Altimeter berjalan dengan lancar!");
+});
+
+const wss = new WebSocket.Server({ server });
+console.log(`🚀 Server HTTP & WebSocket running on port ${PORT}`);
 // ==========================================
 // 1. SETUP MQTT BROKER
 // ==========================================
@@ -22,11 +31,6 @@ const prisma = new PrismaClient({
 const mqttBroker = process.env.MQTT_BROKER || "ws://broker.hivemq.com:8000/mqtt";
 const mqttClient = mqtt.connect(mqttBroker);
 
-// ==========================================
-// 2. SETUP WEBSOCKET SERVER
-// ==========================================
-const wss = new WebSocket.Server({ port: 8080 });
-console.log("🌐 WebSocket running on ws://localhost:8080");
 
 // ==========================================
 // 3. LOGIKA PENERIMAAN & PENYIMPANAN DATA
