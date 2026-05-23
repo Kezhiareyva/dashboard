@@ -39,7 +39,7 @@ export default function AltimeterDashboard() {
 
   // KONEKSI WEBSOCKET KE BACKEND NODE.JS
   useEffect(() => {
-    const ws = new WebSocket("wss://api.kezhia.online");
+    const ws = new WebSocket(import.meta.env.VITE_WS_URL);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);

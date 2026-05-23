@@ -4,6 +4,7 @@ const WebSocket = require("ws");
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { Pool } = require("pg");
+const http = require("http");
 
 // Inisialisasi Prisma Client untuk PostgreSQL
 const pool = new Pool({
@@ -16,8 +17,8 @@ const prisma = new PrismaClient({
   adapter,
 });
 
-const PORT = process.env.PORT || 3000;
-const server = HTMLOutputElement.createServer((req, res) => {
+const PORT = process.env.PORT;
+const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end("Halo! API dan WebSocket Altimeter berjalan dengan lancar!");
 });
@@ -28,7 +29,7 @@ console.log(`🚀 Server HTTP & WebSocket running on port ${PORT}`);
 // 1. SETUP MQTT BROKER
 // ==========================================
 // Menggunakan HiveMQ untuk tes lokal, atau Environment Variable jika di Docker nanti
-const mqttBroker = process.env.MQTT_BROKER || "ws://broker.hivemq.com:8000/mqtt";
+const mqttBroker = process.env.MQTT_BROKER;
 const mqttClient = mqtt.connect(mqttBroker);
 
 
