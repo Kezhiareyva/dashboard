@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "EspDevice" ADD COLUMN     "terakhirAktif" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

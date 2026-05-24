@@ -6,20 +6,30 @@ datasource db {
   provider = "postgresql"
 }
 
+// Tabel Pengguna Web
 model User {
   id       Int      @id @default(autoincrement())
   nama     String
   email    String   @unique
   password String
-
-  altimeterData AltimeterData[]
 }
 
+// Tabel Alat ESP yang Terhubung
+model EspDevice {
+  id            Int      @id @default(autoincrement())
+  identitas     String   @unique 
+  namaAlat      String           
+  terakhirAktif DateTime @default(now()) 
+  
+  data          AltimeterData[]
+}
+
+// Tabel Data Sensor
 model AltimeterData {
   id          Int      @id @default(autoincrement())
   ketinggian  Float
   createdAt   DateTime @default(now())
 
-  userId Int
-  user   User @relation(fields: [userId], references: [id])
+  espId       Int
+  esp         EspDevice @relation(fields: [espId], references: [id])
 }

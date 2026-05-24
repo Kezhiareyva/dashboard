@@ -10,33 +10,33 @@ import {
   Avatar,
   Link
 } from '@mui/material';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import AppRegistrationIcon from '@mui/icons-material/AppRegistration';
 
-export default function Login() {
+export default function Register() {
+  const [nama, setNama] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(import.meta.env.VITE_API_URL + '/api/login', {
+      const response = await fetch(import.meta.env.VITE_API_URL + '/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ nama, email, password })
       });
       
       const data = await response.json();
       
       if (response.ok) {
-        // Simpan data user (nama, email) ke localStorage
-        localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/dashboard'); 
+        alert("Pendaftaran berhasil! Silakan masuk dengan akun baru kamu.");
+        navigate('/login'); 
       } else {
-        alert(data.message); // Munculkan error jika password/email salah
+        alert(data.message); // Menampilkan pesan dari backend (misal: "Email sudah terdaftar!")
       }
     } catch (error) {
-      console.error("Gagal login:", error);
+      console.error("Gagal mendaftar:", error);
       alert("Terjadi kesalahan, tidak dapat terhubung ke server.");
     }
   };
@@ -63,18 +63,31 @@ export default function Login() {
             borderRadius: 4
           }}
         >
-          <Avatar sx={{ m: 1, bgcolor: '#1976d2', width: 48, height: 48 }}>
-            <LockOutlinedIcon />
+          <Avatar sx={{ m: 1, bgcolor: '#2e7d32', width: 48, height: 48 }}>
+            <AppRegistrationIcon />
           </Avatar>
           
           <Typography component="h1" variant="h5" fontWeight={700} gutterBottom sx={{ mt: 1 }}>
-            Selamat Datang
+            Buat Akun Baru
           </Typography>
           <Typography color="text.secondary" variant="body2" sx={{ mb: 3, textAlign: 'center' }}>
-            Silakan masuk ke sistem pemantauan altimeter
+            Daftarkan dirimu untuk memantau dashboard altimeter.
           </Typography>
           
-          <Box component="form" onSubmit={handleLogin} sx={{ mt: 1, width: '100%' }}>
+          <Box component="form" onSubmit={handleRegister} sx={{ mt: 1, width: '100%' }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="nama"
+              label="Nama Lengkap"
+              name="nama"
+              autoComplete="name"
+              autoFocus
+              value={nama}
+              onChange={(e) => setNama(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
             <TextField
               margin="normal"
               required
@@ -83,7 +96,6 @@ export default function Login() {
               label="Alamat Email"
               name="email"
               autoComplete="email"
-              autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
@@ -96,7 +108,7 @@ export default function Login() {
               label="Password"
               type="password"
               id="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
@@ -106,18 +118,19 @@ export default function Login() {
               type="submit"
               fullWidth
               variant="contained"
+              color="success"
               disableElevation
               sx={{ mt: 4, mb: 3, borderRadius: 2, py: 1.5, textTransform: 'none', fontSize: '1rem', fontWeight: 600 }}
             >
-              Masuk Dashboard
+              Daftar Sekarang
             </Button>
 
-            {/* Tambahan Tautan Sign Up */}
+            {/* Tautan untuk kembali ke halaman Login */}
             <Box textAlign="center">
               <Typography variant="body2" color="text.secondary">
-                Belum punya akun?{' '}
-                <Link component={RouterLink} to="/register" variant="body2" sx={{ fontWeight: 600, textDecoration: 'none' }}>
-                  Daftar di sini
+                Sudah punya akun?{' '}
+                <Link component={RouterLink} to="/login" variant="body2" sx={{ fontWeight: 600, textDecoration: 'none' }}>
+                  Masuk di sini
                 </Link>
               </Typography>
             </Box>
