@@ -27,6 +27,7 @@ model EspDevice {
 // Tabel Data Sensor
 model AltimeterData {
   id          Int      @id @default(autoincrement())
+  tekanan     Float
   ketinggian  Float
   createdAt   DateTime @default(now())
 

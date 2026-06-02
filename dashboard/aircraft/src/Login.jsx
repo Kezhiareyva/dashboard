@@ -29,11 +29,12 @@ export default function Login() {
       const data = await response.json();
       
       if (response.ok) {
-        // Simpan data user (nama, email) ke localStorage
+        // Simpan data user dan token JWT ke localStorage
         localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('token', data.token); // <--- SIMPAN TOKEN DI SINI
         navigate('/dashboard'); 
       } else {
-        alert(data.message); // Munculkan error jika password/email salah
+        alert(data.message);
       }
     } catch (error) {
       console.error("Gagal login:", error);

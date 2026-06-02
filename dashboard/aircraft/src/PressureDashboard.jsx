@@ -1,3 +1,8 @@
+import { Snackbar, Alert, IconButton, useTheme } from "@mui/material";
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
+import { ThemeModeContext } from './App'; // Import context yang dibuat di App.jsx
+import { useContext } from 'react';
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -48,6 +53,17 @@ export default function PressureDashboard() {
   // STATE BARU: Untuk menyimpan daftar perangkat ESP32
   const [devices, setDevices] = useState([]);
 
+  // ... state sebelumnya (ketinggian, history, devices) ...
+  
+  // State untuk Notifikasi (Visual Alert)
+  const [openAlert, setOpenAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertSeverity, setAlertSeverity] = useState("info");
+
+  // Hook untuk tema
+  const theme = useTheme();
+  const colorMode = useContext(ThemeModeContext);
+
   useEffect(() => {
     localStorage.setItem("ketinggianHistory", JSON.stringify(history));
     localStorage.setItem("currentKetinggian", ketinggian);
@@ -59,17 +75,34 @@ export default function PressureDashboard() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.ketinggian !== undefined) {
+      if (data.tekanan !== undefined) { // Menggunakan data tekanan hasil Prioritas 1
         setKetinggian(data.ketinggian);
         setHistory((prev) => [
           ...prev.slice(-19),
-          { time: new Date().toLocaleTimeString(), value: data.ketinggian },
+          { time: new Date().toLocaleTimeString(), value: data.tekanan }, // Menampilkan tekanan di grafik
         ]);
+
+        // Cek ambang batas untuk memicu notifikasi
+        if (data.tekanan < 980) {
+          setAlertMessage(`Peringatan! Tekanan sangat rendah: ${data.tekanan} hPa`);
+          setAlertSeverity("warning");
+          setOpenAlert(true);
+        } else if (data.tekanan > 1030) {
+          setAlertMessage(`Peringatan! Tekanan sangat tinggi: ${data.tekanan} hPa`);
+          setAlertSeverity("error");
+          setOpenAlert(true);
+        }
       }
     };
 
     return () => ws.close();
   }, []);
+
+  // Fungsi untuk menutup notifikasi
+  const handleCloseAlert = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setOpenAlert(false);
+  };
 
   // FETCH DEVICES: Mengambil data alat dan status heartbeat setiap 10 detik
   useEffect(() => {
@@ -129,6 +162,18 @@ export default function PressureDashboard() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
             Altimeter Monitor
           </Typography>
+          {/* Tombol Dark / Light Mode */}
+          <IconButton sx={{ ml: 1, mr: 2 }} onClick={colorMode.toggleColorMode} color="inherit">
+            {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+          </IconButton>
+          <Button 
+            color="primary" 
+            variant="text" 
+            onClick={() => navigate('/history')}
+            sx={{ mr: 2, textTransform: "none", fontWeight: 600 }}
+          >
+            Riwayat Data
+          </Button>
           <Button 
             color="primary" 
             variant="text" 
@@ -290,6 +335,17 @@ export default function PressureDashboard() {
           </Typography>
         </Box>
       </Container>
+      {/* Visual Alert (Notifikasi Snackbar) */}
+      <Snackbar 
+        open={openAlert} 
+        autoHideDuration={5000} 
+        onClose={handleCloseAlert}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseAlert} severity={alertSeverity} sx={{ width: '100%', fontWeight: 'bold' }} variant="filled">
+          {alertMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
