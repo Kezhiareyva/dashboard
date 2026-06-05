@@ -9,6 +9,14 @@ import History from './History'; // Pastikan komponen History dari Prioritas 2 s
 
 export const ThemeModeContext = React.createContext({ toggleColorMode: () => {} });
 
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
 function App() {
   const [mode, setMode] = useState('light');
 
@@ -26,6 +34,9 @@ function App() {
       createTheme({
         palette: {
           mode,
+          primary: {
+            main: '#d32f2f',
+          },
           ...(mode === 'light'
             ? {
                 background: {
@@ -53,9 +64,9 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/dashboard" element={<PressureDashboard />} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><PressureDashboard /></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </ThemeProvider>

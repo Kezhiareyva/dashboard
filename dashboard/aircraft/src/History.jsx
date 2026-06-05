@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Container, Typography, Paper, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, Button, AppBar, Toolbar
+  TableCell, TableContainer, TableHead, TableRow, Button
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DownloadIcon from '@mui/icons-material/Download';
+import SidebarLayout from './SidebarLayout';
 
 export default function History() {
   const [dataRiwayat, setDataRiwayat] = useState([]);
@@ -68,18 +68,12 @@ export default function History() {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", backgroundColor: "#f4f6f8" }}>
-      <AppBar position="sticky" elevation={1} sx={{ backgroundColor: "#ffffff", color: "#333" }}>
-        <Toolbar>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/dashboard')} sx={{ mr: 2, textTransform: "none" }}>
-            Kembali
-          </Button>
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            Riwayat Data Sensor
-          </Typography>
+    <SidebarLayout title="Riwayat Data Sensor">
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Box sx={{ width: '100%', display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
           <Button 
             variant="contained" 
-            color="success" 
+            color="primary" 
             startIcon={<DownloadIcon />} 
             onClick={handleExportCSV}
             disableElevation
@@ -87,14 +81,12 @@ export default function History() {
           >
             Export CSV
           </Button>
-        </Toolbar>
-      </AppBar>
+        </Box>
 
-      <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
+        <Paper elevation={0} sx={{ width: '100%', p: { xs: 1, sm: 3 }, borderRadius: 3, border: (theme) => `1px solid ${theme.palette.divider}`, backgroundColor: 'background.paper' }}>
           <TableContainer>
             <Table>
-              <TableHead sx={{ backgroundColor: '#f9fafb' }}>
+              <TableHead sx={{ backgroundColor: 'background.default' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>No</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Perangkat</TableCell>
@@ -116,7 +108,7 @@ export default function History() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">Tidak ada data riwayat.</TableCell>
+                    <TableCell colSpan={5} align="center" sx={{ py: 3 }}>Tidak ada data riwayat.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -124,6 +116,6 @@ export default function History() {
           </TableContainer>
         </Paper>
       </Container>
-    </Box>
+    </SidebarLayout>
   );
 }

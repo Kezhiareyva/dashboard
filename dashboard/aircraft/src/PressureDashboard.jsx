@@ -1,10 +1,5 @@
-import { Snackbar, Alert, IconButton, useTheme } from "@mui/material";
-import Brightness4Icon from '@mui/icons-material/Brightness4';
-import Brightness7Icon from '@mui/icons-material/Brightness7';
-import { ThemeModeContext } from './App'; // Import context yang dibuat di App.jsx
-import { useContext } from 'react';
+import { Snackbar, Alert, useTheme } from "@mui/material";
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -13,9 +8,6 @@ import {
   Container,
   Box,
   Chip,
-  AppBar,
-  Toolbar,
-  Button,
   List,
   ListItem,
   ListItemText,
@@ -25,8 +17,8 @@ import {
 import SpeedIcon from "@mui/icons-material/Speed";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import SensorsIcon from "@mui/icons-material/Sensors";
-import LogoutIcon from "@mui/icons-material/Logout";
 import RouterIcon from '@mui/icons-material/Router';
+import SidebarLayout from './SidebarLayout';
 import {
   AreaChart,
   Area,
@@ -38,15 +30,19 @@ import {
 } from "recharts";
 
 export default function PressureDashboard() {
-  const navigate = useNavigate();
 
   const [ketinggian, setKetinggian] = useState(() => {
     const saved = localStorage.getItem("currentKetinggian");
     return saved ? Number(saved) : 0;
   });
 
-  const [history, setHistory] = useState(() => {
-    const saved = localStorage.getItem("ketinggianHistory");
+  const [tekanan, setTekanan] = useState(() => {
+    const saved = localStorage.getItem("currentTekanan");
+    return saved ? Number(saved) : 0;
+  });
+
+  const [sensorHistory, setSensorHistory] = useState(() => {
+    const saved = localStorage.getItem("sensorHistory");
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -62,12 +58,12 @@ export default function PressureDashboard() {
 
   // Hook untuk tema
   const theme = useTheme();
-  const colorMode = useContext(ThemeModeContext);
 
   useEffect(() => {
-    localStorage.setItem("ketinggianHistory", JSON.stringify(history));
+    localStorage.setItem("sensorHistory", JSON.stringify(sensorHistory));
     localStorage.setItem("currentKetinggian", ketinggian);
-  }, [history, ketinggian]);
+    localStorage.setItem("currentTekanan", tekanan);
+  }, [sensorHistory, ketinggian, tekanan]);
 
   // WEBSOCKET: Menerima data realtime
   useEffect(() => {
@@ -75,11 +71,12 @@ export default function PressureDashboard() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.tekanan !== undefined) { // Menggunakan data tekanan hasil Prioritas 1
+      if (data.tekanan !== undefined && data.ketinggian !== undefined) {
         setKetinggian(data.ketinggian);
-        setHistory((prev) => [
+        setTekanan(data.tekanan);
+        setSensorHistory((prev) => [
           ...prev.slice(-19),
-          { time: new Date().toLocaleTimeString(), value: data.tekanan }, // Menampilkan tekanan di grafik
+          { time: new Date().toLocaleTimeString(), tekanan: data.tekanan, ketinggian: data.ketinggian },
         ]);
 
         // Cek ambang batas untuk memicu notifikasi
@@ -124,9 +121,15 @@ export default function PressureDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const getStatus = () => {
-    if (ketinggian < 650) return { label: "Rendah", color: "info" };
-    if (ketinggian > 750) return { label: "Tinggi", color: "error" };
+  const getStatusKetinggian = () => {
+    if (ketinggian < -146) return { label: "Rendah", color: "warning" };
+    if (ketinggian > 281) return { label: "Tinggi", color: "error" };
+    return { label: "Normal", color: "success" };
+  };
+
+  const getStatusTekanan = () => {
+    if (tekanan < 980) return { label: "Rendah", color: "warning" };
+    if (tekanan > 1030) return { label: "Tinggi", color: "error" };
     return { label: "Normal", color: "success" };
   };
 
@@ -144,144 +147,179 @@ export default function PressureDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    // Hapus data user dari local storage saat logout
-    localStorage.removeItem("user");
-    navigate("/");
-  };
-
-  const status = getStatus();
+  const statusKetinggian = getStatusKetinggian();
+  const statusTekanan = getStatusTekanan();
 
   return (
-    <Box sx={{ minHeight: "100vh", backgroundColor: "#f4f6f8", width: "100vw", overflowX: "hidden" }}>
-      
-      {/* NAVBAR */}
-      <AppBar position="sticky" elevation={1} sx={{ backgroundColor: "#ffffff", color: "#333" }}>
-        <Toolbar>
-          <SensorsIcon sx={{ color: "#1976d2", mr: 2, fontSize: 32 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            Altimeter Monitor
-          </Typography>
-          {/* Tombol Dark / Light Mode */}
-          <IconButton sx={{ ml: 1, mr: 2 }} onClick={colorMode.toggleColorMode} color="inherit">
-            {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-          </IconButton>
-          <Button 
-            color="primary" 
-            variant="text" 
-            onClick={() => navigate('/history')}
-            sx={{ mr: 2, textTransform: "none", fontWeight: 600 }}
-          >
-            Riwayat Data
-          </Button>
-          <Button 
-            color="primary" 
-            variant="text" 
-            onClick={() => navigate('/profile')}
-            sx={{ mr: 2, textTransform: "none", fontWeight: 600 }}
-          >
-            Profil Saya
-          </Button>
-          <Button 
-            color="error" 
-            variant="outlined" 
-            startIcon={<LogoutIcon />}
-            onClick={handleLogout}
-            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
-          >
-            Keluar
-          </Button>
-        </Toolbar>
-      </AppBar>
-
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+    <SidebarLayout title="Dashboard Monitoring">
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <Box mb={4}>
-          <Typography variant="h4" fontWeight={700} gutterBottom sx={{ color: "#000" }}>
+          <Typography variant="h4" fontWeight={700} gutterBottom color="text.primary">
             Dashboard Monitoring
           </Typography>
           <Typography color="text.secondary">
-            Pantauan Ketinggian (Elevasi) Sistem secara *Real-Time*
+            Pantauan Ketinggian (Elevasi) dan Tekanan Sistem secara *Real-Time*
           </Typography>
         </Box>
 
         <Grid container spacing={3}>
           {/* KOLOM KIRI: Informasi Utama & Grafik */}
-          <Grid item xs={12} md={8}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <Card elevation={0} sx={{ borderRadius: 3, border: "1px solid #e0e0e0", height: "100%" }}>
-                  <CardContent>
-                    <Box display="flex" justifyContent="space-between">
-                      <Box>
-                        <Typography color="text.secondary" gutterBottom>Ketinggian Saat Ini</Typography>
-                        <Typography variant="h4" fontWeight={700} sx={{ color: "#1976d2" }}>
-                          {ketinggian} mdpl
-                        </Typography>
+          <Grid item xs={12} md={7}>
+            
+            {/* BAGIAN KETINGGIAN */}
+            <Box mb={4}>
+              <Typography variant="h6" fontWeight={600} gutterBottom color="text.primary" sx={{ mb: 2 }}>
+                Pemantauan Ketinggian
+              </Typography>
+              <Grid container spacing={3} mb={3}>
+                <Grid item xs={12} sm={6}>
+                  <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, height: "100%", backgroundColor: 'background.paper' }}>
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between">
+                        <Box>
+                          <Typography color="text.secondary" gutterBottom>Ketinggian Saat Ini</Typography>
+                          <Typography variant="h4" fontWeight={700} color="primary">
+                            {ketinggian} mdpl
+                          </Typography>
+                        </Box>
+                        <SpeedIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
                       </Box>
-                      <SpeedIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, height: "100%", backgroundColor: 'background.paper' }}>
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between">
+                        <Box>
+                          <Typography color="text.secondary" gutterBottom>Status Ketinggian</Typography>
+                          <Chip
+                            label={statusKetinggian.label}
+                            color={statusKetinggian.color}
+                            sx={{ mt: 0.5, fontSize: 16, px: 2, fontWeight: 600, borderRadius: 2 }}
+                          />
+                        </Box>
+                        <TrendingUpIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
               </Grid>
 
-              <Grid item xs={12} sm={6}>
-                <Card elevation={0} sx={{ borderRadius: 3, border: "1px solid #e0e0e0", height: "100%" }}>
-                  <CardContent>
-                    <Box display="flex" justifyContent="space-between">
-                      <Box>
-                        <Typography color="text.secondary" gutterBottom>Status Tekanan</Typography>
-                        <Chip
-                          label={status.label}
-                          color={status.color}
-                          sx={{ mt: 0.5, fontSize: 16, px: 2, fontWeight: 600, borderRadius: 2 }}
-                        />
-                      </Box>
-                      <TrendingUpIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
+              <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, backgroundColor: 'background.paper' }}>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 3 }} color="text.primary">
+                    Grafik Fluktuasi Ketinggian
+                  </Typography>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={sensorHistory} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                      <defs>
+                        <linearGradient id="colorKetinggian" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
+                      <XAxis dataKey="time" tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} tickMargin={10} />
+                      <YAxis domain={['auto', 'auto']} tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
+                      <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                      <Area
+                        type="monotone"
+                        dataKey="ketinggian"
+                        stroke={theme.palette.primary.main}
+                        strokeWidth={4}
+                        fillOpacity={1}
+                        fill="url(#colorKetinggian)"
+                        dot={{ r: 4, strokeWidth: 2, fill: theme.palette.background.paper, stroke: theme.palette.primary.main }}
+                        activeDot={{ r: 8, fill: theme.palette.primary.main, stroke: theme.palette.background.paper, strokeWidth: 2 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </Box>
 
-            {/* CHART */}
-            <Card elevation={0} sx={{ borderRadius: 3, mt: 3, border: "1px solid #e0e0e0" }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 3 }}>
-                  Grafik Fluktuasi Ketinggian
-                </Typography>
-                <ResponsiveContainer width="100%" height={350}>
-                  <AreaChart data={history} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                    <defs>
-                      <linearGradient id="colorKetinggian" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#1976d2" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#1976d2" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0e0e0" />
-                    <XAxis dataKey="time" tick={{ fill: "#888", fontSize: 12 }} tickMargin={10} />
-                    <YAxis domain={[600, 800]} tick={{ fill: "#888", fontSize: 12 }} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                    <Area
-                      type="monotone"
-                      dataKey="value"
-                      stroke="#1976d2"
-                      strokeWidth={4}
-                      fillOpacity={1}
-                      fill="url(#colorKetinggian)"
-                      dot={{ r: 4, strokeWidth: 2, fill: "#fff", stroke: "#1976d2" }}
-                      activeDot={{ r: 8, fill: "#1976d2", stroke: "#fff", strokeWidth: 2 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            {/* BAGIAN TEKANAN */}
+            <Box mb={4}>
+              <Typography variant="h6" fontWeight={600} gutterBottom color="text.primary" sx={{ mb: 2 }}>
+                Pemantauan Tekanan
+              </Typography>
+              <Grid container spacing={3} mb={3}>
+                <Grid item xs={12} sm={6}>
+                  <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, height: "100%", backgroundColor: 'background.paper' }}>
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between">
+                        <Box>
+                          <Typography color="text.secondary" gutterBottom>Tekanan Saat Ini</Typography>
+                          <Typography variant="h4" fontWeight={700} color="primary">
+                            {tekanan} hPa
+                          </Typography>
+                        </Box>
+                        <SensorsIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, height: "100%", backgroundColor: 'background.paper' }}>
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between">
+                        <Box>
+                          <Typography color="text.secondary" gutterBottom>Status Tekanan</Typography>
+                          <Chip
+                            label={statusTekanan.label}
+                            color={statusTekanan.color}
+                            sx={{ mt: 0.5, fontSize: 16, px: 2, fontWeight: 600, borderRadius: 2 }}
+                          />
+                        </Box>
+                        <TrendingUpIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, backgroundColor: 'background.paper' }}>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 3 }} color="text.primary">
+                    Grafik Fluktuasi Tekanan
+                  </Typography>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={sensorHistory} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                      <defs>
+                        <linearGradient id="colorTekanan" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
+                      <XAxis dataKey="time" tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} tickMargin={10} />
+                      <YAxis domain={['auto', 'auto']} tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
+                      <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                      <Area
+                        type="monotone"
+                        dataKey="tekanan"
+                        stroke={theme.palette.primary.main}
+                        strokeWidth={4}
+                        fillOpacity={1}
+                        fill="url(#colorTekanan)"
+                        dot={{ r: 4, strokeWidth: 2, fill: theme.palette.background.paper, stroke: theme.palette.primary.main }}
+                        activeDot={{ r: 8, fill: theme.palette.primary.main, stroke: theme.palette.background.paper, strokeWidth: 2 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </Box>
           </Grid>
 
           {/* KOLOM KANAN: Daftar Perangkat (Heartbeat) */}
-          <Grid item xs={12} md={4}>
-            <Card elevation={0} sx={{ borderRadius: 3, border: "1px solid #e0e0e0", height: "100%" }}>
+          <Grid item xs={12} md={5}>
+            <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, height: "100%", backgroundColor: 'background.paper' }}>
               <CardContent>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
+                <Typography variant="h6" fontWeight={600} gutterBottom color="text.primary">
                   Perangkat Terhubung
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -303,7 +341,7 @@ export default function PressureDashboard() {
                           <ListItemText
                             primary={
                               <Box display="flex" justifyContent="space-between" alignItems="center">
-                                <Typography fontWeight="bold">{device.identitas}</Typography>
+                                <Typography fontWeight="bold" color="text.primary">{device.identitas}</Typography>
                                 {getDeviceStatus(device.terakhirAktif)}
                               </Box>
                             }
@@ -313,7 +351,9 @@ export default function PressureDashboard() {
                                   {device.namaAlat}
                                 </Typography>
                                 <br />
-                                Terakhir aktif: {new Date(device.terakhirAktif).toLocaleTimeString()}
+                                <Typography component="span" variant="body2" color="text.secondary">
+                                  Terakhir aktif: {new Date(device.terakhirAktif).toLocaleTimeString()}
+                                </Typography>
                               </>
                             }
                           />
@@ -346,6 +386,6 @@ export default function PressureDashboard() {
           {alertMessage}
         </Alert>
       </Snackbar>
-    </Box>
+    </SidebarLayout>
   );
 }

@@ -32,7 +32,7 @@ export default function Login() {
         // Simpan data user dan token JWT ke localStorage
         localStorage.setItem('user', JSON.stringify(data.user));
         localStorage.setItem('token', data.token); // <--- SIMPAN TOKEN DI SINI
-        navigate('/dashboard'); 
+        navigate('/dashboard', { replace: true }); 
       } else {
         alert(data.message);
       }
@@ -64,7 +64,7 @@ export default function Login() {
             borderRadius: 4
           }}
         >
-          <Avatar sx={{ m: 1, bgcolor: '#1976d2', width: 48, height: 48 }}>
+          <Avatar sx={{ m: 1, bgcolor: 'primary.main', width: 48, height: 48 }}>
             <LockOutlinedIcon />
           </Avatar>
           

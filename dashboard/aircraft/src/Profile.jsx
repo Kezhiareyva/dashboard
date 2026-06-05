@@ -1,34 +1,48 @@
 import React from 'react';
-import { Box, Paper, Typography, Avatar, Button, Container } from '@mui/material';
+import { Box, Paper, Typography, Avatar, Button, Container, Divider } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import LogoutIcon from '@mui/icons-material/Logout';
+import SidebarLayout from './SidebarLayout';
 
 export default function Profile() {
   const navigate = useNavigate();
-  // Ambil data user dari localStorage
+  
   const user = JSON.parse(localStorage.getItem('user')) || { nama: 'Guest', email: '-' };
 
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    navigate("/", { replace: true });
+  };
+
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f4f6f8' }}>
-      <Container maxWidth="sm">
-        <Paper elevation={3} sx={{ p: 4, borderRadius: 4, textAlign: 'center' }}>
-          <Avatar sx={{ width: 80, height: 80, margin: '0 auto', bgcolor: '#1976d2', mb: 2 }}>
-            <AccountCircleIcon sx={{ fontSize: 60 }} />
-          </Avatar>
-          <Typography variant="h5" fontWeight="bold">{user.nama}</Typography>
-          <Typography color="text.secondary" sx={{ mb: 4 }}>{user.email}</Typography>
-          
-          <Button 
-            variant="outlined" 
-            startIcon={<ArrowBackIcon />} 
-            onClick={() => navigate('/dashboard')}
-            fullWidth
-          >
-            Kembali ke Dashboard
-          </Button>
-        </Paper>
-      </Container>
-    </Box>
+    <SidebarLayout title="Profil Saya">
+      <Box sx={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Container maxWidth="md" sx={{ display: 'flex', justifyContent: 'center' }}>
+          <Paper elevation={0} sx={{ p: { xs: 4, md: 6 }, borderRadius: 4, textAlign: 'center', border: (theme) => `1px solid ${theme.palette.divider}`, backgroundColor: 'background.paper', width: '100%', maxWidth: 650 }}>
+            <Avatar sx={{ width: 100, height: 100, margin: '0 auto', bgcolor: 'primary.main', mb: 3 }}>
+              <AccountCircleIcon sx={{ fontSize: 72 }} />
+            </Avatar>
+            <Typography variant="h4" fontWeight="bold" color="text.primary" gutterBottom>{user.nama}</Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>{user.email}</Typography>
+            
+            <Divider sx={{ mb: 4 }} />
+            
+            <Button 
+              variant="outlined" 
+              color="error"
+              startIcon={<LogoutIcon />} 
+              onClick={handleLogout}
+              fullWidth
+              size="large"
+              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+            >
+              Keluar
+            </Button>
+          </Paper>
+        </Container>
+      </Box>
+    </SidebarLayout>
   );
 }

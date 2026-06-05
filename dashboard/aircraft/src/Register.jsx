@@ -63,7 +63,7 @@ export default function Register() {
             borderRadius: 4
           }}
         >
-          <Avatar sx={{ m: 1, bgcolor: '#2e7d32', width: 48, height: 48 }}>
+          <Avatar sx={{ m: 1, bgcolor: 'primary.main', width: 48, height: 48 }}>
             <AppRegistrationIcon />
           </Avatar>
           
@@ -118,7 +118,7 @@ export default function Register() {
               type="submit"
               fullWidth
               variant="contained"
-              color="success"
+              color="primary"
               disableElevation
               sx={{ mt: 4, mb: 3, borderRadius: 2, py: 1.5, textTransform: 'none', fontSize: '1rem', fontWeight: 600 }}
             >
