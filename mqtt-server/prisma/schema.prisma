@@ -12,6 +12,7 @@ model User {
   nama     String
   email    String   @unique
   password String
+  role     String   @default("VIEWER")
 }
 
 // Tabel Alat ESP yang Terhubung

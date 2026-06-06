@@ -1,8 +1,9 @@
 import React from 'react';
-import { Box, Paper, Typography, Avatar, Button, Container, Divider } from '@mui/material';
+import { Box, Paper, Typography, Avatar, Button, Container, Divider, Chip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import SidebarLayout from './SidebarLayout';
 
 export default function Profile() {
@@ -25,7 +26,14 @@ export default function Profile() {
               <AccountCircleIcon sx={{ fontSize: 72 }} />
             </Avatar>
             <Typography variant="h4" fontWeight="bold" color="text.primary" gutterBottom>{user.nama}</Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>{user.email}</Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>{user.email}</Typography>
+            
+            <Chip 
+              icon={<AdminPanelSettingsIcon />} 
+              label={user.role || 'VIEWER'} 
+              color={user.role === 'SUPERADMIN' ? 'error' : user.role === 'ADMIN' ? 'primary' : 'default'} 
+              sx={{ mb: 4, fontWeight: 'bold' }} 
+            />
             
             <Divider sx={{ mb: 4 }} />
             

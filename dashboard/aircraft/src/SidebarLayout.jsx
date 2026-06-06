@@ -23,6 +23,7 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import GroupIcon from '@mui/icons-material/Group';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ThemeModeContext } from './App';
 
@@ -40,10 +41,16 @@ export default function SidebarLayout({ children, title = "Altimeter Monitor" })
     setMobileOpen(!mobileOpen);
   };
 
+  const user = JSON.parse(localStorage.getItem('user')) || {};
+
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Riwayat Data', icon: <HistoryIcon />, path: '/history' },
   ];
+
+  if (user.role === 'SUPERADMIN' || user.role === 'ADMIN') {
+    menuItems.push({ text: 'Kelola Pengguna', icon: <GroupIcon />, path: '/users' });
+  }
 
   const drawer = (
     <div>

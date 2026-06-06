@@ -6,6 +6,7 @@ import Login from './Login';
 import Register from './Register';
 import Profile from './Profile';
 import History from './History'; // Pastikan komponen History dari Prioritas 2 sudah di-import
+import UserManagement from './UserManagement';
 
 export const ThemeModeContext = React.createContext({ toggleColorMode: () => {} });
 
@@ -66,6 +67,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><PressureDashboard /></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>

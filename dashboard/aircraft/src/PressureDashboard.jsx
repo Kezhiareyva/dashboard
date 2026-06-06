@@ -101,6 +101,37 @@ export default function PressureDashboard() {
     setOpenAlert(false);
   };
 
+  // FETCH HISTORY DARI DATABASE SAAT PERTAMA KALI MOUNT
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(import.meta.env.VITE_API_URL + "/api/history", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            const recentData = data.slice(0, 20).reverse().map(item => ({
+              time: new Date(item.createdAt).toLocaleTimeString(),
+              tekanan: item.tekanan,
+              ketinggian: item.ketinggian
+            }));
+            setSensorHistory(recentData);
+            setTekanan(data[0].tekanan);
+            setKetinggian(data[0].ketinggian);
+          }
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data history dari database:", error);
+      }
+    };
+
+    fetchHistory();
+  }, []);
+
   // FETCH DEVICES: Mengambil data alat dan status heartbeat setiap 10 detik
   useEffect(() => {
     const fetchDevices = async () => {

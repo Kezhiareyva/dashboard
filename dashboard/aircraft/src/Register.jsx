@@ -8,18 +8,55 @@ import {
   Typography, 
   Paper,
   Avatar,
-  Link
+  Link,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  IconButton,
+  InputAdornment
 } from '@mui/material';
 import AppRegistrationIcon from '@mui/icons-material/AppRegistration';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 export default function Register() {
   const [nama, setNama] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [serverError, setServerError] = useState('');
+  
+  const [openDialog, setOpenDialog] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   const navigate = useNavigate();
+
+  const handleClickShowPassword = () => setShowPassword((show) => !show);
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    setEmailError('');
+    setPasswordError('');
+    setServerError('');
+    
+    // Validasi email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Format email tidak valid (contoh: user@domain.com)');
+      return;
+    }
+    
+    // Validasi password (min 8 char, angka, dan simbol)
+    const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*.,])[a-zA-Z0-9!@#$%^&*.,]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      setPasswordError('Password minimal 8 karakter, mengandung angka dan simbol');
+      return;
+    }
+
     try {
       const response = await fetch(import.meta.env.VITE_API_URL + '/api/register', {
         method: 'POST',
@@ -30,15 +67,19 @@ export default function Register() {
       const data = await response.json();
       
       if (response.ok) {
-        alert("Pendaftaran berhasil! Silakan masuk dengan akun baru kamu.");
-        navigate('/login'); 
+        setOpenDialog(true);
       } else {
-        alert(data.message); // Menampilkan pesan dari backend (misal: "Email sudah terdaftar!")
+        setServerError(data.message); // Menampilkan pesan dari backend
       }
     } catch (error) {
       console.error("Gagal mendaftar:", error);
-      alert("Terjadi kesalahan, tidak dapat terhubung ke server.");
+      setServerError("Terjadi kesalahan, tidak dapat terhubung ke server.");
     }
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    navigate('/login');
   };
 
   return (
@@ -97,7 +138,13 @@ export default function Register() {
               name="email"
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (serverError) setServerError('');
+                if (emailError) setEmailError('');
+              }}
+              error={!!emailError || !!serverError}
+              helperText={emailError || serverError}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             <TextField
@@ -106,11 +153,29 @@ export default function Register() {
               fullWidth
               name="password"
               label="Password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               id="password"
               autoComplete="new-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (passwordError) setPasswordError('');
+              }}
+              error={!!passwordError}
+              helperText={passwordError}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={handleClickShowPassword}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             
@@ -137,6 +202,21 @@ export default function Register() {
           </Box>
         </Paper>
       </Container>
+      
+      {/* Dialog Pendaftaran Berhasil */}
+      <Dialog open={openDialog} onClose={handleCloseDialog} aria-labelledby="register-dialog-title">
+        <DialogTitle id="register-dialog-title">{"Pendaftaran Berhasil!"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Akun Anda telah berhasil dibuat. Silakan masuk menggunakan email dan password baru Anda.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} color="primary" variant="contained" disableElevation sx={{ borderRadius: 2 }}>
+            Lanjut Login
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

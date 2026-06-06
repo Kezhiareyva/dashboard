@@ -10,6 +10,7 @@ const cors = require("cors");
 
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET;
+const bcrypt = require("bcryptjs");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -22,11 +23,17 @@ app.use(express.json());
 // --- API AUTHENTICATION ---
 app.post("/api/register", async (req, res) => {
   const { nama, email, password } = req.body;
+  if (!nama || !email || !password) {
+    return res.status(400).json({ message: "Nama, email, dan password wajib diisi!" });
+  }
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar!" });
     
-    const newUser = await prisma.user.create({ data: { nama, email, password } });
+    // Hash password sebelum disimpan
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await prisma.user.create({ data: { nama, email, password: hashedPassword } });
     res.status(201).json({ message: "Registrasi berhasil!", user: newUser });
   } catch (error) {
     res.status(500).json({ message: "Error server", error: error.message });
@@ -45,6 +52,36 @@ const authenticateToken = (req, res, next) => {
     req.user = user;
     next();
   });
+};
+
+const requireSuperAdmin = (req, res, next) => {
+  if (req.user.role !== 'SUPERADMIN') {
+    return res.status(403).json({ message: "Akses ditolak, hanya Super Admin yang diizinkan!" });
+  }
+  // Cegah token lama berlaku jika email SUPERADMIN diubah di .env
+  if (req.user.email !== process.env.SUPERADMIN_EMAIL) {
+    return res.status(403).json({ message: "Kredensial Super Admin telah usang!" });
+  }
+  next();
+};
+
+const requireAdminOrSuperAdmin = async (req, res, next) => {
+  if (req.user.role === 'SUPERADMIN') return requireSuperAdmin(req, res, next);
+  
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ message: "Akses ditolak, Anda tidak memiliki izin untuk halaman ini!" });
+  }
+
+  try {
+    // Cek DB: Pastikan status ADMIN belum dicabut (mengatasi token JWT yang masih aktif)
+    const userInDb = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!userInDb || userInDb.role !== 'ADMIN') {
+      return res.status(403).json({ message: "Akses ditolak, status Admin Anda telah dicabut!" });
+    }
+    next();
+  } catch (error) {
+    return res.status(500).json({ message: "Kesalahan saat memverifikasi sesi." });
+  }
 };
 
 // --- API UNTUK MENGAMBIL RIWAYAT DATA ---
@@ -66,19 +103,101 @@ app.get("/api/history", authenticateToken, async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email dan password wajib diisi!" });
+  }
   try {
+    // CEK SUPER ADMIN DARI .ENV
+    // Aman dari eksploitasi nilai undefined jika variabel .env tidak diset
+    if (
+      process.env.SUPERADMIN_EMAIL &&
+      process.env.SUPERADMIN_PASSWORD &&
+      email === process.env.SUPERADMIN_EMAIL && 
+      password === process.env.SUPERADMIN_PASSWORD
+    ) {
+      const token = jwt.sign({ id: 'superadmin', email, role: 'SUPERADMIN' }, JWT_SECRET, { expiresIn: '1d' });
+      return res.status(200).json({ 
+        message: "Login berhasil sebagai Super Admin!", 
+        user: { id: 0, nama: "Super Admin", email, role: "SUPERADMIN" }, 
+        token 
+      });
+    }
+
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || user.password !== password) return res.status(401).json({ message: "Kredensial salah!" });
+    if (!user) {
+      return res.status(401).json({ message: "Email tidak terdaftar!", field: "email" });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Password salah!", field: "password" });
+    }
     
     const { password: _, ...userData } = user;
     
-    // Generate Token JWT yang berlaku selama 24 jam
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1d' });
+    // Generate Token JWT yang berlaku selama 24 jam dengan ROLE
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
 
     // Kirim token ke frontend beserta data user
     res.status(200).json({ message: "Login berhasil!", user: userData, token: token });
   } catch (error) {
     res.status(500).json({ message: "Error server", error: error.message });
+  }
+});
+
+// --- API UNTUK MANAJEMEN USER ---
+app.get("/api/users", authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
+  try {
+    // Jika ADMIN, hanya ambil yang role VIEWER. Jika SUPERADMIN, ambil semua.
+    const query = req.user.role === 'ADMIN' ? { where: { role: 'VIEWER' } } : {};
+    
+    const users = await prisma.user.findMany({
+      ...query,
+      select: { id: true, nama: true, email: true, role: true },
+      orderBy: { id: 'asc' }
+    });
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengambil daftar user", error: error.message });
+  }
+});
+
+app.put("/api/users/:id/role", authenticateToken, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+  try {
+    if (!['ADMIN', 'VIEWER'].includes(role)) {
+      return res.status(400).json({ message: "Role tidak valid!" });
+    }
+    const updatedUser = await prisma.user.update({
+      where: { id: Number(id) },
+      data: { role },
+      select: { id: true, nama: true, email: true, role: true }
+    });
+    res.status(200).json({ message: "Role berhasil diubah", user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengubah role", error: error.message });
+  }
+});
+
+app.delete("/api/users/:id", authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Keamanan Backend Tambahan: Jika ADMIN, pastikan target yang dihapus adalah VIEWER
+    if (req.user.role === 'ADMIN') {
+      const targetUser = await prisma.user.findUnique({ where: { id: Number(id) } });
+      if (!targetUser) {
+        return res.status(404).json({ message: "User tidak ditemukan" });
+      }
+      if (targetUser.role !== 'VIEWER') {
+        return res.status(403).json({ message: "Admin hanya bisa menghapus pengguna dengan role VIEWER" });
+      }
+    }
+
+    await prisma.user.delete({ where: { id: Number(id) } });
+    res.status(200).json({ message: "User berhasil dihapus" });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal menghapus user", error: error.message });
   }
 });
 
