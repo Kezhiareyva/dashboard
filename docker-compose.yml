@@ -46,6 +46,8 @@ services:
     build:
       context: ./mqtt-server
       dockerfile: Dockerfile
+    env_file:
+      - ./mqtt-server/.env
     container_name: mqtt-server
     environment:
       - MQTT_BROKER=mqtt://mosquitto:4000
@@ -63,6 +65,8 @@ services:
     build:
       context: ./dashboard/aircraft
       dockerfile: Dockerfile
+    env_file:
+      - ./dashboard/aircraft/.env
     container_name: frontend
     depends_on:
       - mqtt-server
