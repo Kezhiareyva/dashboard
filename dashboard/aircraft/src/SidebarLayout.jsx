@@ -17,11 +17,12 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import HistoryIcon from '@mui/icons-material/History';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SwapVertIcon from '@mui/icons-material/SwapVert';
+import SensorsIcon from '@mui/icons-material/Sensors';
 import PersonIcon from '@mui/icons-material/Person';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
-import SensorsIcon from '@mui/icons-material/Sensors';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import GroupIcon from '@mui/icons-material/Group';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -29,7 +30,7 @@ import { ThemeModeContext } from './App';
 
 const drawerWidth = 260;
 
-export default function SidebarLayout({ children, title = "Altimeter Monitor" }) {
+export default function SidebarLayout({ children, title = "ADTS Monitor" }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const theme = useTheme();
   const colorMode = useContext(ThemeModeContext);
@@ -44,12 +45,15 @@ export default function SidebarLayout({ children, title = "Altimeter Monitor" })
   const user = JSON.parse(localStorage.getItem('user')) || {};
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Riwayat Data', icon: <HistoryIcon />, path: '/history' },
+    { text: 'Dashboard Utama', icon: <DashboardIcon />, path: '/dashboard' },
+    { text: 'Airspeed', icon: <SpeedIcon />, path: '/airspeed' },
+    { text: 'Altimeter', icon: <SensorsIcon />, path: '/altimeter' },
+    { text: 'Vertical Speed', icon: <SwapVertIcon />, path: '/vertical-speed' },
   ];
 
+  const bottomMenuItems = [];
   if (user.role === 'SUPERADMIN' || user.role === 'ADMIN') {
-    menuItems.push({ text: 'Kelola Pengguna', icon: <GroupIcon />, path: '/users' });
+    bottomMenuItems.push({ text: 'Kelola Pengguna', icon: <GroupIcon />, path: '/users' });
   }
 
   const drawer = (
@@ -57,7 +61,7 @@ export default function SidebarLayout({ children, title = "Altimeter Monitor" })
       <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
         <SensorsIcon sx={{ color: theme.palette.primary.main, mr: 1, fontSize: 32 }} />
         <Typography variant="h6" fontWeight="bold" color="primary">
-          Altimeter
+          ADTS System
         </Typography>
       </Toolbar>
       <Divider />
@@ -94,6 +98,35 @@ export default function SidebarLayout({ children, title = "Altimeter Monitor" })
       </List>
       <Divider />
       <List sx={{ px: 2 }}>
+        {bottomMenuItems.map((item) => (
+          <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+            <ListItemButton
+              selected={location.pathname === item.path}
+              onClick={() => {
+                navigate(item.path);
+                if (!isSmUp) setMobileOpen(false);
+              }}
+              sx={{
+                borderRadius: 2,
+                '&.Mui-selected': {
+                  backgroundColor: theme.palette.primary.main + '20',
+                  color: theme.palette.primary.main,
+                  '& .MuiListItemIcon-root': {
+                    color: theme.palette.primary.main,
+                  }
+                },
+                '&:hover': {
+                  backgroundColor: theme.palette.primary.main + '10',
+                }
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40, color: location.pathname === item.path ? theme.palette.primary.main : 'text.secondary' }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 700 : 500 }} />
+            </ListItemButton>
+          </ListItem>
+        ))}
         <ListItem disablePadding>
           <ListItemButton onClick={colorMode.toggleColorMode} sx={{ borderRadius: 2 }}>
             <ListItemIcon sx={{ minWidth: 40, color: 'text.secondary' }}>

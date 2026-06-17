@@ -145,6 +145,34 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+app.put("/api/reset-password", async (req, res) => {
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword) {
+    return res.status(400).json({ message: "Email dan password baru wajib diisi!" });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: "Password minimal 6 karakter!", field: "password" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: "Email tidak terdaftar!", field: "email" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { email },
+      data: { password: hashedPassword }
+    });
+
+    res.status(200).json({ message: "Password berhasil diubah!" });
+  } catch (error) {
+    res.status(500).json({ message: "Error server", error: error.message });
+  }
+});
+
 // --- API UNTUK MANAJEMEN USER ---
 app.get("/api/users", authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
   try {
