@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -16,7 +16,7 @@ import SidebarLayout from './SidebarLayout';
 export default function MainDashboard() {
   const theme = useTheme();
 
-  // Altimeter Data (Real)
+  // States
   const [ketinggian, setKetinggian] = useState(() => {
     const saved = localStorage.getItem("currentKetinggian");
     return saved ? Number(saved) : 0;
@@ -27,7 +27,41 @@ export default function MainDashboard() {
     return saved ? Number(saved) : 0;
   });
 
-  // Websocket for real Altimeter data
+  const [knots, setKnots] = useState(() => {
+    const saved = localStorage.getItem("currentKnots");
+    return saved ? Number(saved) : 0;
+  });
+
+  const [vSpeed, setVSpeed] = useState(() => {
+    const saved = localStorage.getItem("currentVSpeed");
+    return saved ? Number(saved) : 0;
+  });
+
+  const prevDataRef = useRef(null);
+
+  // Helper Functions
+  const calculateKnots = (p) => {
+    const a = 0.0021;
+    const b = 0.0566;
+    const c = 921.4025 - p;
+    const D = (b * b) - (4 * a * c);
+    if (D < 0) return 0;
+    let k = (-b + Math.sqrt(D)) / (2 * a);
+    return k > 0 ? parseFloat(k.toFixed(2)) : 0;
+  };
+
+  const calculateAltitudeFt = (p) => {
+    if (!p || p <= 0) return 0;
+    return (1 - Math.pow(p / 1013.25, 0.190284)) * 145366.45;
+  };
+
+  const calculateVSpeed = (currentAlt, prevAlt, dtSeconds) => {
+    if (dtSeconds <= 0) return 0;
+    const vsi_fps = (currentAlt - prevAlt) / dtSeconds;
+    return parseFloat((vsi_fps * 60).toFixed(2));
+  };
+
+  // Websocket for real data
   useEffect(() => {
     const ws = new WebSocket(import.meta.env.VITE_WS_URL);
 
@@ -36,8 +70,34 @@ export default function MainDashboard() {
       if (data.tekanan !== undefined && data.ketinggian !== undefined) {
         setKetinggian(data.ketinggian);
         setTekanan(data.tekanan);
+
+        // Calculate Airspeed
+        const currentKnots = calculateKnots(data.tekanan);
+        setKnots(currentKnots);
+
+        // Calculate Vertical Speed
+        const currentAlt = calculateAltitudeFt(data.tekanan);
+        const currentTime = new Date();
+        
+        let currentVSpeed = 0;
+        if (prevDataRef.current) {
+          const dtSeconds = (currentTime - prevDataRef.current.time) / 1000;
+          currentVSpeed = calculateVSpeed(currentAlt, prevDataRef.current.alt, dtSeconds);
+          
+          const alpha_vsi = 0.15;
+          // Menggunakan state vSpeed lama bisa berisiko basi di dalam ws.onmessage, tapi cukup untuk perkiraan VSI
+          currentVSpeed = (alpha_vsi * currentVSpeed) + ((1.0 - alpha_vsi) * (parseFloat(localStorage.getItem("currentVSpeed")) || 0));
+          currentVSpeed = parseFloat(currentVSpeed.toFixed(2));
+        }
+        
+        prevDataRef.current = { alt: currentAlt, time: currentTime };
+        setVSpeed(currentVSpeed);
+
+        // Save to Local Storage
         localStorage.setItem("currentKetinggian", data.ketinggian);
         localStorage.setItem("currentTekanan", data.tekanan);
+        localStorage.setItem("currentKnots", currentKnots);
+        localStorage.setItem("currentVSpeed", currentVSpeed);
       }
     };
 
@@ -72,10 +132,10 @@ export default function MainDashboard() {
                 </Box>
                 <Typography color="text.secondary" gutterBottom>Kecepatan Udara Saat Ini</Typography>
                 <Typography variant="h3" fontWeight={700} color="primary" sx={{ mb: 1 }}>
-                  0 <Typography component="span" variant="h5" color="text.secondary">knots</Typography>
+                  {knots} <Typography component="span" variant="h5" color="text.secondary">knots</Typography>
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Status: Tidak ada data
+                  Status: Aktif (Real-time)
                 </Typography>
               </CardContent>
             </Card>
@@ -122,11 +182,11 @@ export default function MainDashboard() {
                   </Typography>
                 </Box>
                 <Typography color="text.secondary" gutterBottom>Kecepatan Vertikal</Typography>
-                <Typography variant="h3" fontWeight={700} color="primary" sx={{ mb: 1 }}>
-                  0 <Typography component="span" variant="h5" color="text.secondary">ft/min</Typography>
+                <Typography variant="h3" fontWeight={700} color={vSpeed > 0 ? "success.main" : vSpeed < 0 ? "error.main" : "primary"} sx={{ mb: 1 }}>
+                  {vSpeed > 0 ? `+${vSpeed}` : vSpeed} <Typography component="span" variant="h5" color="text.secondary">ft/min</Typography>
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Status: Tidak ada data
+                  Status: Aktif (Real-time)
                 </Typography>
               </CardContent>
             </Card>

@@ -257,6 +257,18 @@ mqttClient.on("connect", () => {
   mqttClient.subscribe("iot/pressure");
 });
 
+mqttClient.on("error", (err) => {
+  console.error("❌ MQTT Connection Error:", err);
+});
+
+mqttClient.on("reconnect", () => {
+  console.log("🔄 MQTT Reconnecting...");
+});
+
+mqttClient.on("offline", () => {
+  console.log("⚠️ MQTT Offline");
+});
+
 mqttClient.on("message", async (topic, message) => {
   if (topic === "iot/pressure") {
     const payload = message.toString();
