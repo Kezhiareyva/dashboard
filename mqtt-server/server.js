@@ -29,7 +29,7 @@ app.post("/api/register", async (req, res) => {
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ message: "Email sudah terdaftar!" });
-    
+
     // Hash password sebelum disimpan
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -44,7 +44,7 @@ app.post("/api/register", async (req, res) => {
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer <token>"
-  
+
   if (!token) return res.status(401).json({ message: "Akses ditolak, token tidak ada!" });
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
@@ -67,7 +67,7 @@ const requireSuperAdmin = (req, res, next) => {
 
 const requireAdminOrSuperAdmin = async (req, res, next) => {
   if (req.user.role === 'SUPERADMIN') return requireSuperAdmin(req, res, next);
-  
+
   if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ message: "Akses ditolak, Anda tidak memiliki izin untuk halaman ini!" });
   }
@@ -90,7 +90,7 @@ app.get("/api/history", authenticateToken, async (req, res) => {
     // Mengambil 100 data terbaru, diurutkan dari yang paling baru
     const historyData = await prisma.altimeterData.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 100, 
+      take: 100,
       include: {
         esp: { select: { identitas: true } } // Sertakan nama alat/ESP
       }
@@ -98,6 +98,47 @@ app.get("/api/history", authenticateToken, async (req, res) => {
     res.status(200).json(historyData);
   } catch (error) {
     res.status(500).json({ message: "Gagal mengambil data riwayat", error: error.message });
+  }
+});
+
+app.get("/api/history/chart", authenticateToken, async (req, res) => {
+  try {
+    const { range } = req.query; // '1d', '7d', '30d'
+    
+    let intervalString = '1 days';
+    let truncUnit = 'minute';
+
+    if (range === '7d') {
+      intervalString = '7 days';
+      truncUnit = 'hour';
+    } else if (range === '30d') {
+      intervalString = '30 days';
+      truncUnit = 'day'; // Wait, maybe 12 hours or day
+    }
+
+    const query = `
+      SELECT 
+        date_trunc('${truncUnit}', "createdAt") as "time",
+        AVG(tekanan) as "tekanan",
+        AVG(ketinggian) as "ketinggian"
+      FROM "AltimeterData"
+      WHERE "createdAt" >= NOW() - INTERVAL '${intervalString}'
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `;
+
+    const chartData = await prisma.$queryRawUnsafe(query);
+
+    const formattedData = chartData.map(row => ({
+      time: row.time, // Object Date dari PostgreSQL
+      tekanan: Number(row.tekanan).toFixed(2),
+      ketinggian: Number(row.ketinggian).toFixed(2)
+    }));
+
+    res.status(200).json(formattedData);
+  } catch (error) {
+    console.error("Gagal agregasi:", error);
+    res.status(500).json({ message: "Gagal mengambil data grafik riwayat", error: error.message });
   }
 });
 
@@ -112,14 +153,14 @@ app.post("/api/login", async (req, res) => {
     if (
       process.env.SUPERADMIN_EMAIL &&
       process.env.SUPERADMIN_PASSWORD &&
-      email === process.env.SUPERADMIN_EMAIL && 
+      email === process.env.SUPERADMIN_EMAIL &&
       password === process.env.SUPERADMIN_PASSWORD
     ) {
       const token = jwt.sign({ id: 'superadmin', email, role: 'SUPERADMIN' }, JWT_SECRET, { expiresIn: '1d' });
-      return res.status(200).json({ 
-        message: "Login berhasil sebagai Super Admin!", 
-        user: { id: 0, nama: "Super Admin", email, role: "SUPERADMIN" }, 
-        token 
+      return res.status(200).json({
+        message: "Login berhasil sebagai Super Admin!",
+        user: { id: 0, nama: "Super Admin", email, role: "SUPERADMIN" },
+        token
       });
     }
 
@@ -132,9 +173,9 @@ app.post("/api/login", async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Password salah!", field: "password" });
     }
-    
+
     const { password: _, ...userData } = user;
-    
+
     // Generate Token JWT yang berlaku selama 24 jam dengan ROLE
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
 
@@ -178,7 +219,7 @@ app.get("/api/users", authenticateToken, requireAdminOrSuperAdmin, async (req, r
   try {
     // Jika ADMIN, hanya ambil yang role VIEWER. Jika SUPERADMIN, ambil semua.
     const query = req.user.role === 'ADMIN' ? { where: { role: 'VIEWER' } } : {};
-    
+
     const users = await prisma.user.findMany({
       ...query,
       select: { id: true, nama: true, email: true, role: true },
@@ -252,6 +293,9 @@ server.listen(PORT, () => {
 const mqttBroker = process.env.MQTT_BROKER;
 const mqttClient = mqtt.connect(mqttBroker);
 
+// Objek untuk menyimpan waktu terakhir penyimpanan DB per ESP
+const lastDbUpdate = {};
+
 mqttClient.on("connect", () => {
   console.log(`✅ MQTT connected to ${mqttBroker}`);
   mqttClient.subscribe("iot/pressure");
@@ -272,55 +316,57 @@ mqttClient.on("offline", () => {
 mqttClient.on("message", async (topic, message) => {
   if (topic === "iot/pressure") {
     const payload = message.toString();
-    
+
     try {
       const data = JSON.parse(payload);
 
-      // Ubah validasi untuk memastikan ESP mengirim identitas dan tekanan
-      if (!data.identitas || !data.tekanan) {
-        console.log("⚠️ Data ditolak: ESP tidak mengirimkan 'identitas' atau 'tekanan'");
-        return; 
+      // Ubah validasi untuk memastikan ESP mengirim identitas, tekanan, dan ketinggian
+      if (!data.identitas || data.tekanan === undefined || data.ketinggian === undefined) {
+        console.log("⚠️ Data ditolak: ESP tidak mengirimkan 'identitas', 'tekanan', atau 'ketinggian'");
+        return;
       }
 
-      // Rumus konversi Barometrik: Tekanan (hPa) ke Ketinggian (mdpl)
-      // Asumsi P0 (Tekanan di permukaan laut) adalah 1013.25 hPa
-      const P0 = 1013.25;
-      const kalkulasiKetinggian = 44330 * (1 - Math.pow((data.tekanan / P0), 0.1903));
-      const ketinggianDibulatkan = parseFloat(kalkulasiKetinggian.toFixed(2));
+      // Membatasi penyimpanan DB agar tidak memberatkan server (misal tiap 5 detik)
+      const now = Date.now();
+      const lastUpdate = lastDbUpdate[data.identitas] || 0;
+      const shouldSaveToDb = (now - lastUpdate) >= 5000;
 
-      // 1. Catat/Update ESP yang mengirim data (Fungsi Heartbeat)
-      const esp = await prisma.espDevice.upsert({
-        where: { identitas: data.identitas },
-        update: { terakhirAktif: new Date() },
-        create: {
-          identitas: data.identitas,
-          namaAlat: "Alat Baru (" + data.identitas + ")",
-          terakhirAktif: new Date()
-        }
-      });
+      if (shouldSaveToDb) {
+        // 1. Catat/Update ESP yang mengirim data (Fungsi Heartbeat)
+        const esp = await prisma.espDevice.upsert({
+          where: { identitas: data.identitas },
+          update: { terakhirAktif: new Date() },
+          create: {
+            identitas: data.identitas,
+            namaAlat: "Alat Baru (" + data.identitas + ")",
+            terakhirAktif: new Date()
+          }
+        });
 
-      // 2. Simpan data tekanan dan ketinggian ke database
-      await prisma.altimeterData.create({
-        data: { 
-          tekanan: data.tekanan,
-          ketinggian: ketinggianDibulatkan, 
-          espId: esp.id 
-        }
-      });
-      
-      console.log(`💾 Data dari ${esp.identitas}: Tekanan ${data.tekanan} hPa | Ketinggian ${ketinggianDibulatkan} mdpl`);
+        // 2. Simpan data tekanan dan ketinggian ke database
+        await prisma.altimeterData.create({
+          data: {
+            tekanan: data.tekanan,
+            ketinggian: data.ketinggian,
+            espId: esp.id
+          }
+        });
+
+        console.log(`💾 Data disimpan ke DB dari ${esp.identitas}: Tekanan ${data.tekanan} hPa | Ketinggian ${data.ketinggian} mdpl`);
+        lastDbUpdate[data.identitas] = now;
+      }
 
       // 3. Kirim data yang sudah lengkap ke Frontend via WebSocket
       const payloadToFrontend = JSON.stringify({
         identitas: data.identitas,
         tekanan: data.tekanan,
-        ketinggian: ketinggianDibulatkan,
+        ketinggian: data.ketinggian,
         waktu: new Date().toISOString()
       });
 
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
-          client.send(payloadToFrontend); 
+          client.send(payloadToFrontend);
         }
       });
 

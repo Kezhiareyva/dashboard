@@ -1,0 +1,22 @@
+{
+  "name": "coba-react-iot-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root runner untuk menjalankan backend MQTT server dan React dashboard sekaligus.",
+  "scripts": {
+    "dev": "concurrently -n BACKEND,DASHBOARD -c cyan,magenta \"npm --prefix mqtt-server start\" \"npm --prefix dashboard/aircraft run dev -- --host 0.0.0.0\"",
+    "start": "npm run dev",
+    "backend": "npm --prefix mqtt-server start",
+    "dashboard": "npm --prefix dashboard/aircraft run dev -- --host 0.0.0.0",
+    "build": "npm --prefix dashboard/aircraft run build",
+    "lint": "npm --prefix dashboard/aircraft run lint",
+    "install:all": "npm install && npm --prefix mqtt-server install && npm --prefix dashboard/aircraft install",
+    "prisma:generate": "npm --prefix mqtt-server run prisma:generate"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

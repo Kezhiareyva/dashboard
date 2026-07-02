@@ -1,7 +1,7 @@
 import { Snackbar, Alert, useTheme } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import {
-  Card, CardContent, Typography, Grid, Container, Box, Chip, List, ListItem, ListItemText, ListItemIcon, Divider, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button
+  Card, CardContent, Typography, Grid, Container, Box, Chip, List, ListItem, ListItemText, ListItemIcon, Divider, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, FormControl, InputLabel, Select, MenuItem
 } from "@mui/material";
 import SpeedIcon from "@mui/icons-material/Speed";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
@@ -45,7 +45,7 @@ export default function Altimeter() {
   });
 
   const [devices, setDevices] = useState([]);
-  
+
   const [openAlert, setOpenAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const [alertSeverity, setAlertSeverity] = useState("info");
@@ -53,7 +53,45 @@ export default function Altimeter() {
   // State for History Table
   const [dataRiwayat, setDataRiwayat] = useState([]);
 
+  // State untuk Grafik Jangka Panjang
+  const [chartRange, setChartRange] = useState("1d");
+  const [aggregatedHistory, setAggregatedHistory] = useState([]);
+
   const theme = useTheme();
+
+  // Ref untuk membatasi pemutaran suara agar tidak berisik berulang-ulang
+  const lastSoundPlayed = React.useRef(0);
+
+  const playAlertSound = () => {
+    const now = Date.now();
+    // Putar suara maksimal 1 kali setiap 3 detik
+    if (now - lastSoundPlayed.current < 3000) return;
+    lastSoundPlayed.current = now;
+
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+
+      const audioCtx = new AudioContext();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Nada A5
+
+      // Volume dibuat cukup rendah agar tidak terlalu mengagetkan (0.05)
+      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.5);
+    } catch (e) {
+      console.error("Gagal memutar suara peringatan:", e);
+    }
+  };
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -67,25 +105,46 @@ export default function Altimeter() {
 
   useEffect(() => {
     const ws = new WebSocket(import.meta.env.VITE_WS_URL);
+    let lastChartUpdate = 0;
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.tekanan !== undefined && data.ketinggian !== undefined) {
+        // Angka teks diupdate seketika (real-time millisecond)
         setKetinggian(data.ketinggian);
         setTekanan(data.tekanan);
-        setSensorHistory((prev) => [
-          ...prev.slice(-19),
-          { time: new Date().toLocaleTimeString(), tekanan: data.tekanan, ketinggian: data.ketinggian },
-        ]);
+
+        // Grafik diupdate maksimal 1 kali tiap 1 detik (1000ms) agar browser tidak hang
+        const now = Date.now();
+        if (now - lastChartUpdate >= 1000) {
+          setSensorHistory((prev) => [
+            ...prev.slice(-19),
+            { time: new Date().toLocaleTimeString(), tekanan: data.tekanan, ketinggian: data.ketinggian },
+          ]);
+          lastChartUpdate = now;
+        }
+
+        let isAlert = false;
 
         if (data.tekanan < 980) {
           setAlertMessage(`Peringatan! Tekanan sangat rendah: ${data.tekanan} mbar`);
           setAlertSeverity("warning");
           setOpenAlert(true);
+          isAlert = true;
         } else if (data.tekanan > 1030) {
           setAlertMessage(`Peringatan! Tekanan sangat tinggi: ${data.tekanan} mbar`);
           setAlertSeverity("error");
           setOpenAlert(true);
+          isAlert = true;
+        }
+
+        // Cek ketinggian juga
+        if (data.ketinggian < -146 || data.ketinggian > 281) {
+          isAlert = true;
+        }
+
+        if (isAlert) {
+          playAlertSound();
         }
       }
     };
@@ -110,7 +169,7 @@ export default function Altimeter() {
         if (res.ok) {
           const data = await res.json();
           setDataRiwayat(data); // for table
-          
+
           if (data && data.length > 0) {
             const recentData = data.slice(0, 20).reverse().map(item => ({
               time: new Date(item.createdAt).toLocaleTimeString(),
@@ -129,6 +188,33 @@ export default function Altimeter() {
 
     fetchHistory();
   }, []);
+
+  useEffect(() => {
+    const fetchAggregatedData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/history/chart?range=${chartRange}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Format time untuk Recharts
+          const formatted = data.map(item => ({
+            time: new Date(item.time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
+            tekanan: parseFloat(item.tekanan),
+            ketinggian: parseFloat(item.ketinggian)
+          }));
+          setAggregatedHistory(formatted);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data agregasi:", error);
+      }
+    };
+
+    fetchAggregatedData();
+  }, [chartRange]);
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -243,11 +329,16 @@ export default function Altimeter() {
                         <Box display="flex" justifyContent="space-between">
                           <Box>
                             <Typography color="text.secondary" gutterBottom>Status Ketinggian</Typography>
-                            <Chip
-                              label={statusKetinggian.label}
-                              color={statusKetinggian.color}
-                              sx={{ mt: 0.5, fontSize: 16, px: 2, fontWeight: 600, borderRadius: 2 }}
-                            />
+                            <Box sx={{ mb: 1 }}>
+                              <Chip
+                                label={statusKetinggian.label}
+                                color={statusKetinggian.color}
+                                sx={{ mt: 0.5, fontSize: 16, px: 2, fontWeight: 600, borderRadius: 2 }}
+                              />
+                            </Box>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Batas: Rendah (&lt; -146) | Normal | Tinggi (&gt; 281)
+                            </Typography>
                           </Box>
                           <TrendingUpIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
                         </Box>
@@ -265,8 +356,8 @@ export default function Altimeter() {
                       <AreaChart data={sensorHistory} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                         <defs>
                           <linearGradient id="colorKetinggian" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0}/>
+                            <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.8} />
+                            <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
@@ -317,11 +408,16 @@ export default function Altimeter() {
                         <Box display="flex" justifyContent="space-between">
                           <Box>
                             <Typography color="text.secondary" gutterBottom>Status Tekanan</Typography>
-                            <Chip
-                              label={statusTekanan.label}
-                              color={statusTekanan.color}
-                              sx={{ mt: 0.5, fontSize: 16, px: 2, fontWeight: 600, borderRadius: 2 }}
-                            />
+                            <Box sx={{ mb: 1 }}>
+                              <Chip
+                                label={statusTekanan.label}
+                                color={statusTekanan.color}
+                                sx={{ mt: 0.5, fontSize: 16, px: 2, fontWeight: 600, borderRadius: 2 }}
+                              />
+                            </Box>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Batas: Rendah (&lt; 980) | Normal | Tinggi (&gt; 1030)
+                            </Typography>
                           </Box>
                           <TrendingUpIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
                         </Box>
@@ -339,8 +435,8 @@ export default function Altimeter() {
                       <AreaChart data={sensorHistory} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                         <defs>
                           <linearGradient id="colorTekanan" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0}/>
+                            <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.8} />
+                            <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
@@ -374,7 +470,7 @@ export default function Altimeter() {
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     Status perangkat diperbarui setiap 10 detik.
                   </Typography>
-                  
+
                   <List sx={{ width: '100%', bgcolor: 'background.paper' }}>
                     {devices.length === 0 ? (
                       <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 3 }}>
@@ -418,13 +514,78 @@ export default function Altimeter() {
           </Grid>
         </CustomTabPanel>
 
-        {/* TAB 2: TABEL RIWAYAT */}
+        {/* TAB 2: TABEL RIWAYAT & GRAFIK JANGKA PANJANG */}
         <CustomTabPanel value={tabValue} index={1}>
-          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              startIcon={<DownloadIcon />} 
+
+          {/* BAGIAN GRAFIK JANGKA PANJANG */}
+          <Box mb={4}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6" fontWeight={600} color="text.primary">
+                Grafik Tren Jangka Panjang
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="range-select-label">Rentang Waktu</InputLabel>
+                <Select
+                  labelId="range-select-label"
+                  value={chartRange}
+                  label="Rentang Waktu"
+                  onChange={(e) => setChartRange(e.target.value)}
+                >
+                  <MenuItem value="1d">1 Hari Terakhir</MenuItem>
+                  <MenuItem value="7d">7 Hari Terakhir</MenuItem>
+                  <MenuItem value="30d">30 Hari Terakhir</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, backgroundColor: 'background.paper' }}>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  {aggregatedHistory.length > 0 ? (
+                    <AreaChart data={aggregatedHistory} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
+                      <XAxis dataKey="time" tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} tickMargin={10} />
+                      <YAxis yAxisId="left" domain={['auto', 'auto']} tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
+                      <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
+                      <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                      <Area
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="tekanan"
+                        stroke={theme.palette.primary.main}
+                        fill={theme.palette.primary.light}
+                        fillOpacity={0.3}
+                        name="Tekanan (mbar)"
+                      />
+                      <Area
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="ketinggian"
+                        stroke={theme.palette.error.main}
+                        fill={theme.palette.error.light}
+                        fillOpacity={0.3}
+                        name="Ketinggian (mdpl)"
+                      />
+                    </AreaChart>
+                  ) : (
+                    <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                      <Typography color="text.secondary">Tidak ada data untuk rentang waktu ini.</Typography>
+                    </Box>
+                  )}
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* BAGIAN TABEL DATA */}
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight={600} color="text.primary">
+              Tabel Data Riwayat (100 Terakhir)
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<DownloadIcon />}
               onClick={handleExportCSV}
               disableElevation
               sx={{ textTransform: 'none', borderRadius: 2 }}
@@ -474,9 +635,9 @@ export default function Altimeter() {
           </Typography>
         </Box>
       </Container>
-      <Snackbar 
-        open={openAlert} 
-        autoHideDuration={5000} 
+      <Snackbar
+        open={openAlert}
+        autoHideDuration={5000}
         onClose={handleCloseAlert}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
