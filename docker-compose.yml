@@ -46,6 +46,7 @@ services:
     build:
       context: ./mqtt-server
       dockerfile: Dockerfile
+      network: host
     env_file:
       - ./mqtt-server/.env
     container_name: mqtt-server
@@ -65,6 +66,7 @@ services:
     build:
       context: ./dashboard/aircraft
       dockerfile: Dockerfile
+      network: host
     env_file:
       - ./dashboard/aircraft/.env
     container_name: frontend

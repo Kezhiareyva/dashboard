@@ -239,7 +239,7 @@ export default function Altimeter() {
     let csvContent = "ID,Identitas Alat,Tekanan (mbar),Ketinggian (mdpl),Ketinggian (ft),Waktu Pencatatan\n";
     dataRiwayat.forEach(row => {
       const waktu = new Date(row.createdAt).toLocaleString();
-      csvContent += `${row.id},${row.esp?.identitas || '-'},${row.tekanan},${row.ketinggian},${(row.ketinggian * 3.28084).toFixed(1)},"${waktu}"\n`;
+      csvContent += `${row.id},${row.esp?.identitas || '-'},${row.tekanan},${row.ketinggian},${Math.round((row.ketinggian * 3.28084) / 100) * 100},"${waktu}"\n`;
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -314,7 +314,7 @@ export default function Altimeter() {
                           <Box>
                             <Typography color="text.secondary" gutterBottom>Ketinggian Saat Ini</Typography>
                             <Typography variant="h4" fontWeight={700} color="primary">
-                              {ketinggian} mdpl <Typography component="span" variant="h6" color="text.secondary">({(ketinggian * 3.28084).toFixed(1)} ft)</Typography>
+                              {ketinggian} mdpl <Typography component="span" variant="h6" color="text.secondary">({Math.round((ketinggian * 3.28084) / 100) * 100} ft)</Typography>
                             </Typography>
                           </Box>
                           <SpeedIcon color="action" sx={{ fontSize: 48, opacity: 0.7 }} />
@@ -613,7 +613,7 @@ export default function Altimeter() {
                         <TableCell>{index + 1}</TableCell>
                         <TableCell>{row.esp?.identitas || 'Tidak diketahui'}</TableCell>
                         <TableCell>{row.tekanan}</TableCell>
-                        <TableCell>{row.ketinggian} / {(row.ketinggian * 3.28084).toFixed(1)}</TableCell>
+                        <TableCell>{row.ketinggian} / {Math.round((row.ketinggian * 3.28084) / 100) * 100}</TableCell>
                         <TableCell>{new Date(row.createdAt).toLocaleString()}</TableCell>
                       </TableRow>
                     ))
