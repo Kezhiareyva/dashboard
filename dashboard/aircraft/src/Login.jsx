@@ -98,10 +98,10 @@ export default function Login() {
           </Avatar>
           
           <Typography component="h1" variant="h5" fontWeight={700} gutterBottom sx={{ mt: 1 }}>
-            Halo, selamat Datang
+            Selamat Datang
           </Typography>
           <Typography color="text.secondary" variant="body2" sx={{ mb: 3, textAlign: 'center' }}>
-            Silakan masuk ke sistem pemantauan altimeter
+            Silakan masuk ke sistem monitoring altimeter
           </Typography>
           
           {!loginSuccess ? (
